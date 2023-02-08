@@ -52,6 +52,8 @@ public class SendAlarmService {
     private void sendAlarm(GetAlarmMessage senderAlarm, GetAlarmMessage receiverAlarm,
                           Long senderId, Long receiverId) {
         log.info("[SEND ALARM] START senderId : {}, receiverId : {}", senderId, receiverId);
+        log.info("senderAlarm : {}", senderAlarm);
+        log.info("receiverAlarm : {}", receiverAlarm);
         redisTemplate.convertAndSend("/topic/alarm/member/" + senderId, senderAlarm);
         redisTemplate.convertAndSend("/topic/alarm/member/" + receiverId, receiverAlarm);
         log.info("[SEND ALARM] END");
