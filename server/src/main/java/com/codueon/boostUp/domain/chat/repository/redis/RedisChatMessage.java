@@ -47,11 +47,10 @@ public class RedisChatMessage {
      * @param receiverMessage 입장 문구(Receiver)
      * @author mozzi327
      */
-    public void initialMessage(Long chatRoomId, RedisChat senderMessage, RedisChat receiverMessage) {
+    public void initialMessage(Long chatRoomId, RedisChat enterMessage, int count) {
         String key = getKey(chatRoomId);
         if (operations.zCard(key) != 0) return;
-        operations.add(key, senderMessage, 0);
-        operations.add(key, receiverMessage, 1);
+        operations.add(key, enterMessage, count);
     }
 
     /**
@@ -64,6 +63,22 @@ public class RedisChatMessage {
         String key = getKey(redisChat.getChatRoomId());
         Long size = operations.zCard(key);
         operations.add(key, redisChat, size);
+    }
+
+    /**
+     * Redis 가장 최근 메시지 조회 메서드
+     *
+     * @param key 식별 키
+     * @return RedisChat
+     * @author mozzi327
+     */
+    public RedisChat getLatestMessage(String key) {
+        RedisChat redisChat = objectToEntity(operations.popMax(key).getValue());
+        Long size = operations.zCard(key);
+        if (redisChat.getChatRoomId() == null && size == 0)
+            throw new BusinessLogicException(ExceptionCode.CHAT_NOT_FOUND);
+        operations.add(key, redisChat, size);
+        return redisChat;
     }
 
     /**
@@ -86,22 +101,6 @@ public class RedisChatMessage {
      */
     public void removeAllMessageInChatRoom(Long chatRoomId) {
         redisTemplate.delete(getKey(chatRoomId));
-    }
-
-    /**
-     * Redis 가장 최근 메시지 조회 메서드
-     *
-     * @param key 식별 키
-     * @return RedisChat
-     * @author mozzi327
-     */
-    public RedisChat getLatestMessage(String key) {
-        RedisChat redisChat = objectToEntity(operations.popMax(key).getValue());
-        Long size = operations.zCard(key);
-        if (redisChat.getChatRoomId() == null && size == 0)
-            throw new BusinessLogicException(ExceptionCode.CHAT_NOT_FOUND);
-        operations.add(key, redisChat, size);
-        return redisChat;
     }
 
     /**

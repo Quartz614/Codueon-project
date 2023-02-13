@@ -2,16 +2,12 @@ package com.codueon.boostUp.domain.chat.service;
 
 import com.codueon.boostUp.domain.chat.dto.PostMessage;
 import com.codueon.boostUp.domain.chat.dto.RedisChat;
-import com.codueon.boostUp.domain.chat.event.vo.SendAlarmMessageEvent;
+import com.codueon.boostUp.domain.chat.event.vo.AlarmChatListEvent;
 import com.codueon.boostUp.domain.chat.repository.redis.RedisChatMessage;
 import com.codueon.boostUp.domain.chat.utils.MessageType;
-import com.codueon.boostUp.domain.member.exception.AuthException;
-import com.codueon.boostUp.global.exception.ExceptionCode;
-import com.codueon.boostUp.global.security.token.JwtAuthenticationToken;
+import com.codueon.boostUp.domain.vo.AuthVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.listener.ChannelTopic;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,29 +28,36 @@ public class ChatService {
      * @author mozzi327
      */
     @Transactional
-    public void setRedisChatInfo(PostMessage message, JwtAuthenticationToken token) {
-        if (token == null) throw new AuthException(ExceptionCode.INVALID_AUTH_TOKEN);
-        RedisChat createChat = makeRedisChat(
-                token.getName(),
-                token.getId(),
-                message.getChatRoomId(),
-                message.getMessageContent());
-        createChat.settingCurrentTime();
-        redisChatMessage.saveChatMessage(createChat);
+    public void setRedisChatInfo(PostMessage message, AuthVO authInfo) {
+        RedisChat createChat = RedisChat.of(message, authInfo);
         eventPublisher.publishEvent(createChat);
         sendAlarmEvent(message);
     }
 
     /**
      * 알람 처리 이벤트 메서드
+     *
      * @param message 메시지 정보
      * @author mozzi327
      */
     public void sendAlarmEvent(PostMessage message) {
-        SendAlarmMessageEvent event = SendAlarmMessageEvent.builder()
-                .chatRoomId(message.getChatRoomId())
-                .senderId(message.getSenderId())
-                .receiverId(message.getReceiverId())
+        sendAlarm(message.getChatRoomId(), message.getSenderId(), false);
+        sendAlarm(message.getChatRoomId(), message.getReceiverId(), true);
+    }
+
+    /**
+     * 알람 전송 이벤트 메서드
+     *
+     * @param chatRoomId 채팅방 식별자
+     * @param memberId   사용자 식별자
+     * @param isReceiver Receiver 여부
+     * @author mozzi327
+     */
+    public void sendAlarm(Long chatRoomId, Long memberId, boolean isReceiver) {
+        AlarmChatListEvent event = AlarmChatListEvent.builder()
+                .chatRoomId(chatRoomId)
+                .memberId(memberId)
+                .isReceiver(isReceiver)
                 .build();
         eventPublisher.publishEvent(event);
     }
@@ -82,12 +85,12 @@ public class ChatService {
 
     /**
      * 채팅방 메시지 전체 조회 메서드
+     *
      * @param chatRoomId 채팅방 식별자
      * @return List(RedisChat)
      * @author mozzi327
      */
-    public List<RedisChat> getChatMessages(JwtAuthenticationToken token, Long chatRoomId) {
-        if (token == null) throw new AuthException(ExceptionCode.INVALID_AUTH_TOKEN);
+    public List<RedisChat> getChatMessages(AuthVO authInfo, Long chatRoomId) {
         return redisChatMessage.findAll(chatRoomId);
     }
 }

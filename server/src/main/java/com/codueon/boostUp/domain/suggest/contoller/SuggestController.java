@@ -5,7 +5,7 @@ import com.codueon.boostUp.domain.suggest.dto.*;
 import com.codueon.boostUp.domain.suggest.response.Message;
 import com.codueon.boostUp.domain.suggest.service.SuggestDbService;
 import com.codueon.boostUp.domain.suggest.service.SuggestService;
-import com.codueon.boostUp.global.security.token.JwtAuthenticationToken;
+import com.codueon.boostUp.domain.vo.AuthVO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,89 +28,84 @@ public class SuggestController {
 
     /**
      * 신청 프로세스 1 신청 생성 컨트롤러 메서드
-     * @param lessonId 과외 식별자
-     * @param post 신청 생성 DTO
-     * @return ResponseEntity
+     *
+     * @param lessonId       과외 식별자
+     * @param post           신청 생성 DTO
+     * @param authentication 인증 정보
      * @author LeeGoh
      */
     @PostMapping("/suggest/lesson/{lesson-id}")
     public ResponseEntity<?> createSuggest(@PathVariable("lesson-id") Long lessonId,
                                            @RequestBody @Valid PostSuggest post,
                                            Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        suggestService.createSuggest(post, lessonId, memberId);
+        suggestService.createSuggest(post, lessonId, AuthVO.of(authentication));
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     /**
      * 신청 프로세스 2-1 신청 수락 컨트롤러 메서드
-     * @param suggestId 신청 식별자
-     * @param post quantity 과외 횟수 DTO
-     * @return ResponseEntity
+     *
+     * @param suggestId      신청 식별자
+     * @param post           quantity 과외 횟수 DTO
+     * @param authentication 인증 정보
      * @author LeeGoh
      */
     @PostMapping("/suggest/{suggest-id}/accept")
-    public ResponseEntity acceptSuggest(@PathVariable("suggest-id") Long suggestId,
-                                        @RequestBody @Valid PostPaymentUrl post,
-                                        Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        suggestService.acceptSuggest(suggestId, memberId, post.getQuantity());
+    public ResponseEntity<?> acceptSuggest(@PathVariable("suggest-id") Long suggestId,
+                                           @RequestBody @Valid PostPaymentUrl post,
+                                           Authentication authentication) {
+        suggestService.acceptSuggest(suggestId, AuthVO.of(authentication), post.getQuantity());
         return ResponseEntity.ok().build();
     }
 
     /**
      * 신청 프로세스 2-2 신청 거절 컨트롤러 메서드
-     * @param suggestId 신청 식별자
-     * @param postReason 거절 사유 DTO
-     * @return ResponseEntity
+     *
+     * @param suggestId      신청 식별자
+     * @param postReason     거절 사유 DTO
+     * @param authentication 인증 정보
      * @author LeeGoh
      */
     @PostMapping("/suggest/{suggest-id}/decline")
-    public ResponseEntity declineSuggest(@PathVariable("suggest-id") Long suggestId,
-                                         @RequestBody @Valid PostReason postReason,
-                                         Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        suggestService.declineSuggest(suggestId, memberId, postReason);
+    public ResponseEntity<?> declineSuggest(@PathVariable("suggest-id") Long suggestId,
+                                            @RequestBody @Valid PostReason postReason,
+                                            Authentication authentication) {
+        suggestService.declineSuggest(suggestId, AuthVO.of(authentication), postReason);
         return ResponseEntity.noContent().build();
     }
 
     /**
      * 신청 프로세스 3 결제 페이지 요청 컨트롤러 메서드
-     * @param suggestId 신청 식별자
-     * @return ResponseEntity
+     *
+     * @param suggestId      신청 식별자
+     * @param authentication 인증 정보
+     * @return GetPaymentInfo 결제 페이지 정보
      * @author LeeGoh
      */
     @GetMapping("/suggest/{suggest-id}/payment/info")
-    public ResponseEntity getPaymentInfo(@PathVariable("suggest-id") Long suggestId,
-                                         Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        return ResponseEntity.ok(suggestDbService.getPaymentInfoOnMyPage(suggestId, memberId));
+    public ResponseEntity<GetPaymentInfo> getPaymentInfo(@PathVariable("suggest-id") Long suggestId,
+                                                         Authentication authentication) {
+        return ResponseEntity.ok(suggestDbService.getPaymentInfoOnMyPage(suggestId, AuthVO.ofMemberId(authentication)));
     }
 
     /**
      * 신청 프로세스 4-1 결제 URL 요청 컨트롤러 메서드 Kakao
+     *
      * @param suggestId 신청 식별자
-     * @return Message
+     * @return Message 메시지
      * @author LeeGoh
      */
     @GetMapping("/suggest/{suggest-id}/kakao/payment")
     public ResponseEntity<Message<?>> orderKakaoPayment(@PathVariable("suggest-id") Long suggestId) {
 
-        Message<?> message = suggestService.getKaKapPayUrl(suggestId);
+        Message<?> message = suggestService.getKaKaoPayUrl(suggestId);
         if (message.getData() == null) suggestService.getFailedPayMessage();
         return ResponseEntity.ok().body(message);
     }
 
     /**
      * 신청 프로세스 4-2 결제 URL 요청 컨트롤러 메서드 Toss
+     *
      * @param suggestId 신청 식별자
      * @return Message
      * @author LeeGoh
@@ -118,25 +113,23 @@ public class SuggestController {
     @GetMapping("/suggest/{suggest-id}/toss/payment/{payment-id}")
     public ResponseEntity<Message<?>> orderTossPayment(@PathVariable("suggest-id") Long suggestId,
                                                        @PathVariable("payment-id") int paymentId) {
-
         Message<?> message = suggestService.getTossPayUrl(suggestId, paymentId);
         if (message.getData() == null) suggestService.getFailedPayMessage();
         return ResponseEntity.ok().body(message);
     }
 
 
-
     /**
      * 신청 프로세스 5-1 결제 성공 컨트롤러 메서드 Kakao
+     *
      * @param suggestId 신청 식별자
-     * @param pgToken Payment Gateway Token
+     * @param pgToken   Payment Gateway Token
      * @return Message
      * @author LeeGoh
      */
     @GetMapping("/api/suggest/{suggest-id}/kakao/success")
     public ResponseEntity<Message<?>> successKakaoPayment(@PathVariable("suggest-id") Long suggestId,
                                                           @RequestParam("pg_token") String pgToken) {
-
         Message<?> message = suggestService.getSuccessKakaoPaymentInfo(suggestId, pgToken);
         if (message.getData() == null) suggestService.getFailedPayMessage();
         return ResponseEntity.ok().build();
@@ -144,13 +137,13 @@ public class SuggestController {
 
     /**
      * 신청 프로세스 5-2 결제 성공 컨트롤러 메서드 Toss
+     *
      * @param suggestId 신청 식별자
      * @return Message
      * @author LeeGoh
      */
     @GetMapping("/api/suggest/{suggest-id}/toss/success")
     public ResponseEntity<Message<?>> successTossPayment(@PathVariable("suggest-id") Long suggestId) {
-
         Message<?> message = suggestService.getSuccessTossPaymentInfo(suggestId);
         if (message.getData() == null) suggestService.getFailedPayMessage();
         return ResponseEntity.ok().build();
@@ -158,6 +151,7 @@ public class SuggestController {
 
     /**
      * 신청 프로세스 6 결제 취소 컨트롤러 메서드 Kakao
+     *
      * @param suggestId 신청 식별자
      * @return String
      * @author LeeGoh
@@ -169,6 +163,7 @@ public class SuggestController {
 
     /**
      * 신청 프로세스 7-1 결제 실패 컨트롤러 메서드 Kakao
+     *
      * @param suggestId 신청 식별자
      * @return String
      * @author LeeGoh
@@ -180,6 +175,7 @@ public class SuggestController {
 
     /**
      * 신청 프로세스 7-2 결제 실패 컨트롤러 메서드 Toss
+     *
      * @param suggestId 신청 식별자
      * @return String
      * @author LeeGoh
@@ -191,128 +187,124 @@ public class SuggestController {
 
     /**
      * 신청 프로세스 8 결제 여부 확인
+     *
      * @param suggestId 신청 식별자
+     * @param authentication 인증 정보
      * @return WrapPaymentStatusCheck
      * @author LeeGoh
      */
     @GetMapping("suggest/{suggest-id}/payment/check")
-    public ResponseEntity paymentStatusCheck(@PathVariable("suggest-id") Long suggestId,
-                                             Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        Boolean paymentCheck = suggestService.getPaymentStatusCheck(suggestId, memberId);
+    public ResponseEntity<WrapPaymentStatusCheck> paymentStatusCheck(@PathVariable("suggest-id") Long suggestId,
+                                                                     Authentication authentication) {
+        Boolean paymentCheck = suggestService.getPaymentStatusCheck(suggestId, AuthVO.ofMemberId(authentication));
         return ResponseEntity.ok().body(new WrapPaymentStatusCheck(paymentCheck));
     }
 
     /**
      * 신청 프로세스 9 과외 종료 컨트롤러 메서드
+     *
      * @param suggestId 신청 식별자
+     * @param authentication 인증 정보
      * @return ResponseEntity
      * @author LeeGoh
      */
     @GetMapping("/suggest/{suggest-id}/done")
-    public ResponseEntity endOfLesson(@PathVariable("suggest-id") Long suggestId,
-                                      Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        suggestService.setSuggestStatusAndEndTime(suggestId, memberId);
+    public ResponseEntity<?> endOfLesson(@PathVariable("suggest-id") Long suggestId,
+                                         Authentication authentication) {
+        suggestService.setSuggestStatusAndEndTime(suggestId, AuthVO.ofMemberId(authentication));
         return ResponseEntity.ok().build();
     }
 
     /**
      * 신청 프로세스 10 환불 컨트롤러 메서드
+     *
      * @param suggestId 신청 식별자
+     * @param authentication 인증 정보
+     * @return Message
      * @author LeeGoh
      */
     @GetMapping("/suggest/{suggest-id}/refund")
-    public ResponseEntity<Message> refundPayment(@PathVariable("suggest-id") Long suggestId,
-                                                 Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        Message message = suggestService.refundPaymentKakaoOrToss(suggestId, memberId);
+    public ResponseEntity<?> refundPayment(@PathVariable("suggest-id") Long suggestId,
+                                           Authentication authentication) {
+        Message message = suggestService.refundPaymentKakaoOrToss(suggestId, AuthVO.ofMemberId(authentication));
         return ResponseEntity.ok().body(message);
     }
 
     /**
      * 환불 조회 컨트롤러 메서드
+     *
      * @param suggestId 신청 식별자
+     * @param authentication 인증 정보
+     * @return GetRefundPayment
      * @author LeeGoh
      */
     @GetMapping("/suggest/{suggest-id}/refund/info")
-    public ResponseEntity getRefundPaymentInfo(@PathVariable("suggest-id") Long suggestId,
-                                               Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        return ResponseEntity.ok().body(suggestService.getRefundPaymentInfo(suggestId, memberId));
+    public ResponseEntity<GetRefundPayment> getRefundPaymentInfo(@PathVariable("suggest-id") Long suggestId,
+                                                                 Authentication authentication) {
+        return ResponseEntity.ok().body(suggestService.getRefundPaymentInfo(suggestId, AuthVO.ofMemberId(authentication)));
     }
 
     /**
      * 출석부 1 출석부 조회 컨트롤러 메서드
+     *
      * @param suggestId 신청 식별자
+     * @param authentication 인증 정보
      * @author LeeGoh
      */
     @GetMapping("/suggest/{suggest-id}/attendance")
-    public ResponseEntity getLessonAttendance(@PathVariable("suggest-id") Long suggestId,
-                                              Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        return ResponseEntity.ok(suggestService.getLessonAttendance(suggestId, memberId));
+    public ResponseEntity<GetLessonAttendance> getLessonAttendance(@PathVariable("suggest-id") Long suggestId,
+                                                                   Authentication authentication) {
+        return ResponseEntity.ok(suggestService.getLessonAttendance(suggestId, AuthVO.ofMemberId(authentication)));
     }
 
     /**
      * 출석부 2 출석 인정(출석 횟수 차감) 컨트롤러 메서드
+     *
      * @param suggestId 신청 식별자
+     * @param authentication 인증 정보
      * @author LeeGoh
      */
     @GetMapping("/suggest/{suggest-id}/attendance/check")
-    public ResponseEntity lessonAttendanceCheck(@PathVariable("suggest-id") Long suggestId,
-                                                Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        Integer quantityCount = suggestService.teacherChecksAttendance(suggestId, memberId);
+    public ResponseEntity<WrapQuantityCount> lessonAttendanceCheck(@PathVariable("suggest-id") Long suggestId,
+                                                                   Authentication authentication) {
+        Integer quantityCount = suggestService.teacherChecksAttendance(suggestId, AuthVO.ofMemberId(authentication));
         return ResponseEntity.ok().body(new WrapQuantityCount(quantityCount));
     }
 
     /**
      * 출석부 3 출석 인정 취소(출석 횟수 증가) 컨트롤러 메서드
+     *
      * @param suggestId 신청 식별자
+     * @param authentication 인증 정보
      * @author LeeGoh
      */
     @GetMapping("/suggest/{suggest-id}/attendance/cancel")
-    public ResponseEntity lessonAttendanceCancel(@PathVariable("suggest-id") Long suggestId,
-                                                 Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        Integer quantityCount = suggestService.teacherCancelAttendance(suggestId, memberId);
+    public ResponseEntity<WrapQuantityCount> lessonAttendanceCancel(@PathVariable("suggest-id") Long suggestId,
+                                                                    Authentication authentication) {
+        Integer quantityCount = suggestService.teacherCancelAttendance(suggestId, AuthVO.ofMemberId(authentication));
         return ResponseEntity.ok().body(new WrapQuantityCount(quantityCount));
     }
 
     /**
      * 결제 영수증 조회 컨트롤러 메서드
+     *
      * @param suggestId 신청 식별자
+     * @param authentication 인증 정보
      * @return ResponseEntity
      * @author LeeGoh
      */
     @GetMapping("/suggest/{suggest-id}/receipt")
-    public ResponseEntity getPaymentReceipt(@PathVariable("suggest-id") Long suggestId,
-                                            Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        return ResponseEntity.ok(suggestDbService.getPaymentReceiptOnMyPage(suggestId, memberId));
+    public ResponseEntity<GetPaymentReceipt> getPaymentReceipt(@PathVariable("suggest-id") Long suggestId,
+                                                               Authentication authentication) {
+        return ResponseEntity.ok(suggestDbService.getPaymentReceiptOnMyPage(suggestId, AuthVO.ofMemberId(authentication)));
     }
 
     /**
      * 마이페이지 선생님용 신청내역 조회 컨트롤러 메서드
+     *
      * @param lessonId 과외 식별자
-     * @param tabId 탭 번호
+     * @param tabId    탭 번호
+     * @param authentication 인증 정보
      * @param pageable 페이지 정보
      * @return MultiResponseDto
      * @author LeeGoh
@@ -322,86 +314,67 @@ public class SuggestController {
                                                                @PathVariable("tab-id") int tabId,
                                                                Authentication authentication,
                                                                Pageable pageable) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        Page<GetTutorSuggest> suggestions = suggestDbService.getTutorSuggestsOnMyPage(lessonId, memberId, tabId, pageable);
+        Page<GetTutorSuggest> suggestions = suggestDbService.getTutorSuggestsOnMyPage(lessonId, AuthVO.ofMemberId(authentication), tabId, pageable);
         return ResponseEntity.ok(new MultiResponseDto<>(suggestions));
     }
 
     /**
      * 마이페이지 학생용 신청내역 조회 컨트롤러 메서드
+     *
      * @param pageable 페이지 정보
+     * @param authentication 인증 정보
      * @return MultiResponseDto
      * @author LeeGoh
      */
     @GetMapping("/suggest/student")
     public ResponseEntity<MultiResponseDto<?>> getStudentSuggest(Pageable pageable,
                                                                  Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        Page<GetStudentSuggest> suggestions = suggestDbService.getStudentSuggestsOnMyPage(memberId, pageable);
+        Page<GetStudentSuggest> suggestions = suggestDbService.getStudentSuggestsOnMyPage(AuthVO.ofMemberId(authentication), pageable);
         return ResponseEntity.ok(new MultiResponseDto<>(suggestions));
     }
 
     /**
      * 신청 취소 컨트롤러 메서드
+     *
      * @param suggestId 신청 식별자
+     * @param authentication 인증 정보
      * @return ResponseEntity
      * @author LeeGoh
      */
     @DeleteMapping("/suggest/{suggest-id}")
-    public ResponseEntity cancelSuggest(@PathVariable("suggest-id") Long suggestId,
+    public ResponseEntity<?> cancelSuggest(@PathVariable("suggest-id") Long suggestId,
                                         Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        suggestService.cancelSuggest(suggestId, memberId);
+        suggestService.cancelSuggest(suggestId, AuthVO.of(authentication));
         return ResponseEntity.noContent().build();
     }
 
     /**
      * 강사 종료 과외 삭제
+     *
      * @param suggestId 신청 식별자
+     * @param authentication 인증 정보
      * @return ResponseEntity
      * @author LeeGoh
      */
     @DeleteMapping("/suggest/{suggest-id}/tutor")
-    public ResponseEntity deleteTutorEndOfSuggest(@PathVariable("suggest-id") Long suggestId,
-                                                  Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        suggestService.deleteTutorEndOfSuggest(suggestId, memberId);
+    public ResponseEntity<?> deleteTutorEndOfSuggest(@PathVariable("suggest-id") Long suggestId,
+                                                     Authentication authentication) {
+        suggestService.deleteTutorEndOfSuggest(suggestId, AuthVO.ofMemberId(authentication));
         return ResponseEntity.noContent().build();
     }
 
     /**
      * 학생 종료 과외 삭제
+     *
      * @param suggestId 신청 식별자
+     * @param authentication 인증 정보
      * @return ResponseEntity
      * @author LeeGoh
      */
     @DeleteMapping("/suggest/{suggest-id}/student")
-    public ResponseEntity deleteStudentEndOfSuggest(@PathVariable("suggest-id") Long suggestId,
-                                                    Authentication authentication) {
-
-        JwtAuthenticationToken token = (JwtAuthenticationToken) authentication;
-        Long memberId = getMemberIdIfExistToken(token);
-        suggestService.deleteStudentEndOfSuggest(suggestId, memberId);
+    public ResponseEntity<?> deleteStudentEndOfSuggest(@PathVariable("suggest-id") Long suggestId,
+                                                       Authentication authentication) {
+        suggestService.deleteStudentEndOfSuggest(suggestId, AuthVO.ofMemberId(authentication));
         return ResponseEntity.noContent().build();
     }
-
-    /**
-     * 로그인 확인 메서드
-     * @param token 토큰 정보
-     * @return Long
-     * @author mozzi327
-     */
-    private Long getMemberIdIfExistToken(JwtAuthenticationToken token) {
-        if (token == null) return null;
-        else return token.getId();
-    }
-
 }

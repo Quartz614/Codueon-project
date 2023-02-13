@@ -1,27 +1,38 @@
 package com.codueon.boostUp.domain.chat.event.listener;
 
-import com.codueon.boostUp.domain.chat.event.vo.SendAlarmMessageEvent;
-import com.codueon.boostUp.domain.chat.event.vo.SendEnterRoomMessageEvent;
-import com.codueon.boostUp.domain.chat.service.SendAlarmService;
+import com.codueon.boostUp.domain.chat.event.vo.AlarmChatListEvent;
+import com.codueon.boostUp.domain.chat.event.vo.InitialChatRoomListEvent;
+import com.codueon.boostUp.domain.chat.service.EventAlarmService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.event.TransactionPhase;
-import org.springframework.transaction.event.TransactionalEventListener;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class SendAlarmMessageEventListener {
-    private final SendAlarmService sendAlarmService;
+    private final EventAlarmService sendAlarmService;
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMPLETION)
-    public void handleChatRoomAlarm(SendAlarmMessageEvent event) {
-        sendAlarmService.setAlarmAndSendAlarm(event.getSenderId(), event.getReceiverId(), event.getChatRoomId());
+    /**
+     * 알람 메시지 전송 EventListener 메서드
+     *
+     * @param event 전송할 알람 메시지
+     * @author mozzi327
+     */
+    @EventListener
+    public void handleChatRoomAlarm(AlarmChatListEvent event) {
+        sendAlarmService.setAlarmAndSendAlarm(event.getMemberId(), event.getChatRoomId(), event.isReceiver());
     }
 
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void handleEnterChatRoomAlarm(SendEnterRoomMessageEvent event) {
+    /**
+     * 입장 시 알람 메시지 전송 EventListener 메서드
+     *
+     * @param event 입잡 시 알람 메시지
+     * @author mozzi327
+     */
+    @EventListener
+    public void handleEnterChatRoomAlarm(InitialChatRoomListEvent event) {
         sendAlarmService.sendEnterAlarm(event.getChatRoom(), event.getReceiverChat());
     }
 }

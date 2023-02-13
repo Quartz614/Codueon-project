@@ -1,6 +1,7 @@
 package com.codueon.boostUp.domain.lesson.repository;
 
 import com.codueon.boostUp.domain.lesson.dto.get.GetLesson;
+import com.codueon.boostUp.domain.lesson.dto.get.GetLessonInfoForAlarm;
 import com.codueon.boostUp.domain.lesson.dto.get.GetMainPageLesson;
 import com.codueon.boostUp.domain.lesson.dto.post.PostSearchLesson;
 import org.springframework.data.domain.Page;
@@ -13,6 +14,8 @@ public interface CustomLessonRepository {
     Page<GetMainPageLesson> getMainPageLessonByLanguageAndBookmarkInfo(Long memberId, Integer languageId, Pageable pageable);
     Page<GetMainPageLesson> getDetailSearchMainPageLesson(PostSearchLesson postSearchLesson, Pageable pageable);
     Page<GetMainPageLesson> getDetailSearchMainPageLessonAndGetBookmarkInfo(Long memberId, PostSearchLesson postSearchLesson, Pageable pageable);
-    GetLesson getDetailLesson(Long lessonId);
+    GetLesson getDetailLesson(Long lessonId, Long memberId);
+
+    GetLessonInfoForAlarm getLessonInfoForAlarm(Long lessonId);
     Long getMemberIdByLessonId(Long lessonId);
 }

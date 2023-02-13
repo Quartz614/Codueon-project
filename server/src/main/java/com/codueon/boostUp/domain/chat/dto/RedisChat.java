@@ -1,6 +1,8 @@
 package com.codueon.boostUp.domain.chat.dto;
 
+import com.codueon.boostUp.domain.chat.utils.AlarmType;
 import com.codueon.boostUp.domain.chat.utils.MessageType;
+import com.codueon.boostUp.domain.vo.AuthVO;
 import com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.fasterxml.jackson.datatype.jsr310.deser.LocalDateTimeDeserializer;
@@ -35,23 +37,24 @@ public class RedisChat implements Serializable {
                      Long senderId,
                      String message,
                      MessageType messageType,
-                     String displayName) {
+                     String displayName,
+                     LocalDateTime createdAt) {
         this.chatRoomId = chatRoomId;
         this.senderId = senderId;
         this.message = message;
         this.messageType = messageType;
         this.displayName = displayName;
+        this.createdAt = createdAt;
     }
 
-    public void addEnterMessage() {
-        this.message = "[알림] " + displayName + "님이 입장하셨습니다.";
-    }
-
-    public void addLeaveMessage() {
-        this.message = "[알림] " + displayName + "님이 나가셨습니다.";
-    }
-
-    public void settingCurrentTime() {
-        this.createdAt = LocalDateTime.now();
+    public static RedisChat of(PostMessage message, AuthVO authInfo) {
+        return RedisChat.builder()
+                .chatRoomId(message.getChatRoomId())
+                .senderId(authInfo.getMemberId())
+                .displayName(authInfo.getName())
+                .message(message.getMessageContent())
+                .messageType(MessageType.TALK)
+                .createdAt(LocalDateTime.now())
+                .build();
     }
 }
