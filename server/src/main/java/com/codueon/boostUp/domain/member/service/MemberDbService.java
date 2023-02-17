@@ -1,5 +1,6 @@
 package com.codueon.boostUp.domain.member.service;
 
+import com.codueon.boostUp.domain.lesson.service.LessonDbService;
 import com.codueon.boostUp.domain.member.dto.PostPasswordInLoginPage;
 import com.codueon.boostUp.domain.member.entity.Member;
 import com.codueon.boostUp.domain.member.exception.AuthException;
@@ -109,6 +110,8 @@ public class MemberDbService {
         if (redisUtils.getEmailAuthorizationCode(changePassword.getEmail()) == null)
             throw new AuthException(ExceptionCode.INVALID_EMAIL_CODE);
         Member findMember = ifExistsMemberByEmail(changePassword.getEmail());
+        if(passwordEncoder.matches(changePassword.getChangePassword(), findMember.getPassword()))
+            throw new BusinessLogicException(ExceptionCode.IMPOSSIBLE_CHANGE_SAME_PASSWORD);
         findMember.editNewPassword(encodingPassword(changePassword.getChangePassword()));
         saveMember(findMember);
     }
